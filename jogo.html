@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mestre da Reciclagem - V2 (Menu e Fases)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #12181b;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            color: #4caf50;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .instructions {
+            background-color: #2c3e50;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            text-align: center;
+            border: 1px solid #34495e;
+        }
+        #gameCanvas {
+            border: 4px solid #4caf50;
+            border-radius: 8px;
+            background: linear-gradient(to bottom, #87ceeb 0%, #e0f7fa 70%, #81c784 70%, #388e3c 100%);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 15px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            font-weight: bold;
+            color: white;
+            background-color: #2e7d32;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #1b5e20;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Mestre da Reciclagem - V2</h1>
+    <div class="instructions">
+        Mova a lixeira com <strong>Seta Esquerda (←)</strong> e <strong>Seta Direita (→)</strong> ou <strong>A / D</strong>.<br>
+        A lixeira troca de cor automaticamente conforme o tipo de lixo exigido na fase!
+    </div>
+
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <div class="controls">
+        <button onclick="goToMenu()">Menu Principal</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Estados do Jogo: 'MENU', 'PLAYING', 'LEVEL_COMPLETE', 'GAME_OVER', 'GAME_WIN'
+        let gameState = 'MENU';
+        let currentLevel = 1;
+        let score = 0;
+        let lives = 3;
+
+        // Tipos de Lixo e Cores
+        const TRASH_TYPES = {
+            PLASTIC: { name: 'Plástico', color: '#e91e63', binColor: '#1565c0', label: 'GARRAFA' }, // Lixeira Azul
+            PAPER:   { name: 'Papel',    color: '#00bcd4', binColor: '#0d47a1', label: 'PAPEL' },   // Lixeira Azul Escuro
+            METAL:   { name: 'Metal',    color: '#ff9800', binColor: '#f57f17', label: 'LATA' },    // Lixeira Amarela
+            GLASS:   { name: 'Vidro',    color: '#8bc34a', binColor: '#2e7d32', label: 'VIDRO' }    // Lixeira Verde
+        };
+
+        // Configuração das Fases
+        const LEVELS = {
+            1: {
+                title: 'Fase 1: Reciclagem de Plástico',
+                targetScore: 50,
+                speed: 3,
+                trashType: TRASH_TYPES.PLASTIC,
+                description: 'Pegue apenas recicláveis de PLÁSTICO!'
+            },
+            2: {
+                title: 'Fase 2: Coleta de Papel',
+                targetScore: 60,
+                speed: 4.5,
+                trashType: TRASH_TYPES.PAPER,
+                description: 'A velocidade aumentou! Recicle PAPEL!'
+            },
+            3: {
+                title: 'Fase 3: Metais e Alumínio',
+                targetScore: 70,
+                speed: 6,
+                trashType: TRASH_TYPES.METAL,
+                description: 'Desafio Rápido! Colete LATAS DE METAL!'
+            }
+        };
+
+        // Player (Lixeira)
+        const player = {
+            width: 80,
+            height: 50,
+            x: canvas.width / 2 - 40,
+            y: canvas.height - 60,
+            speed: 8
+        };
+
+        // Item que Cai
+        const item = {
+            width: 30,
+            height: 40,
+            x: 0,
+            y: -50,
+            type: TRASH_TYPES.PLASTIC
+        };
+
+        let keys = {};
+
+        document.addEventListener('keydown', (e) => { keys[e.key] = true; });
+        document.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+        function startLevel(levelNum) {
+            currentLevel = levelNum;
+            score = 0;
+            lives = 3;
+            gameState = 'PLAYING';
+            player.x = canvas.width / 2 - player.width / 2;
+            resetItem();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function resetItem() {
+            const levelConfig = LEVELS[currentLevel];
+            item.type = levelConfig.trashType;
+            item.x = Math.random() * (canvas.width - item.width);
+            item.y = -item.height;
+        }
+
+        function goToMenu() {
+            gameState = 'MENU';
+            draw();
+        }
+
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            const levelConfig = LEVELS[currentLevel];
+
+            // Movimento da Lixeira
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) {
+                player.x -= player.speed;
+            }
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) {
+                player.x += player.speed;
+            }
+
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+
+            // Queda do Item
+            item.y += levelConfig.speed;
+
+            // Colisão com a Lixeira
+            if (
+                item.x < player.x + player.width &&
+                item.x + item.width > player.x &&
+                item.y + item.height > player.y &&
+                item.y < player.y + player.height
+            ) {
+                score += 10;
+                resetItem();
+
+                if (score >= levelConfig.targetScore) {
+                    if (LEVELS[currentLevel + 1]) {
+                        gameState = 'LEVEL_COMPLETE';
+                    } else {
+                        gameState = 'GAME_WIN';
+                    }
+                }
+            }
+
+            // Tocou o chão
+            if (item.y > canvas.height) {
+                lives -= 1;
+                resetItem();
+
+                if (lives <= 0) {
+                    gameState = 'GAME_OVER';
+                }
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (gameState === 'MENU') {
+                drawMenu();
+            } else if (gameState === 'PLAYING') {
+                drawGame();
+            } else if (gameState === 'LEVEL_COMPLETE') {
+                drawOverlay('FASE CONCLUÍDA!', `Pontuação atingida! Pressione [ESPAÇO] para ir para a Fase ${currentLevel + 1}`, '#4caf50');
+            } else if (gameState === 'GAME_OVER') {
+                drawOverlay('GAME OVER!', 'Sua vidas acabaram. Pressione [ESPAÇO] para tentar novamente.', '#f44336');
+            } else if (gameState === 'GAME_WIN') {
+                drawOverlay('VOCÊ ZEROU O JOGO!', 'Parabéns! Você se tornou o Mestre da Reciclagem!', '#ffeb3b');
+            }
+        }
+
+        function drawMenu() {
+            ctx.fillStyle = 'rgba(18, 24, 27, 0.95)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#4caf50';
+            ctx.font = 'bold 30px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('SELEÇÃO DE FASES', canvas.width / 2, 70);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px Arial';
+            ctx.fillText('Escolha uma fase para jogar:', canvas.width / 2, 110);
+
+            // Botões de Fase
+            for (let i = 1; i <= 3; i++) {
+                const lvl = LEVELS[i];
+                const yPos = 140 + (i - 1) * 75;
+
+                ctx.fillStyle = lvl.trashType.binColor;
+                ctx.fillRect(100, yPos, 400, 60);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px Arial';
+                ctx.textAlign = 'left';
+                ctx.fillText(lvl.title, 120, yPos + 25);
+
+                ctx.font = '13px Arial';
+                ctx.fillText(`Meta: ${lvl.targetScore} pts | ${lvl.description}`, 120, yPos + 45);
+            }
+
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#888888';
+            ctx.font = '14px Arial';
+            ctx.fillText('Clique nas caixas ou Pressione [1], [2] ou [3] no teclado', canvas.width / 2, 380);
+            ctx.textAlign = 'left';
+        }
+
+        function drawGame() {
+            const levelConfig = LEVELS[currentLevel];
+
+            // Desenha Lixeira (Cor adaptada à fase)
+            ctx.fillStyle = levelConfig.trashType.binColor;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 11px Arial';
+            ctx.fillText(`LIXO: ${levelConfig.trashType.name.toUpperCase()}`, player.x + 5, player.y + 30);
+
+            // Desenha Item
+            ctx.fillStyle = levelConfig.trashType.color;
+            ctx.fillRect(item.x, item.y, item.width, item.height);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px Arial';
+            ctx.fillText(item.type.label, item.x + 2, item.y + 24);
+
+            // Interface (UI)
+            ctx.fillStyle = '#1e272c';
+            ctx.font = 'bold 16px Arial';
+            ctx.fillText(`${levelConfig.title}`, 20, 30);
+            ctx.fillText(`Pontos: ${score} / ${levelConfig.targetScore}`, 20, 55);
+            ctx.fillText(`Vidas: ${lives}`, canvas.width - 100, 30);
+        }
+
+        function drawOverlay(title, subtitle, color) {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = color;
+            ctx.font = 'bold 36px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(title, canvas.width / 2, canvas.height / 2 - 20);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '16px Arial';
+            ctx.fillText(subtitle, canvas.width / 2, canvas.height / 2 + 30);
+            ctx.textAlign = 'left';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (gameState === 'MENU') {
+                if (e.key === '1') startLevel(1);
+                if (e.key === '2') startLevel(2);
+                if (e.key === '3') startLevel(3);
+            } else if (gameState === 'LEVEL_COMPLETE' && e.key === ' ') {
+                startLevel(currentLevel + 1);
+            } else if ((gameState === 'GAME_OVER' || gameState === 'GAME_WIN') && e.key === ' ') {
+                goToMenu();
+            }
+        });
+
+        canvas.addEventListener('click', (e) => {
+            if (gameState !== 'MENU') return;
+            const rect = canvas.getBoundingClientRect();
+            const clickY = e.clientY - rect.top;
+
+            if (clickY >= 140 && clickY <= 200) startLevel(1);
+            if (clickY >= 215 && clickY <= 275) startLevel(2);
+            if (clickY >= 290 && clickY <= 350) startLevel(3);
+        });
+
+        function gameLoop() {
+            update();
+            draw();
+            if (gameState === 'PLAYING') {
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        // Inicia no Menu
+        goToMenu();
+    </script>
+</body>
+</html>
