@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mestre da Reciclagem v2</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #70E686 0%, #00DB28 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 1000px;
+            aspect-ratio: 4/3;
+            background: #fff;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            font-weight: bold;
+            color: #333;
+            z-index: 10;
+        }
+
+        .score-info {
+            display: flex;
+            gap: 30px;
+            font-size: 20px;
+        }
+
+        .lives-display {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .phase-info {
+            font-size: 18px;
+            text-align: center;
+            flex: 1;
+        }
+
+        .combo-display {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: #FFD700;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            opacity: 0;
+            animation: comboPopup 0.8s ease-out;
+        }
+
+        @keyframes comboPopup {
+            0% {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(0.5);
+            }
+            100% {
+                opacity: 0;
+                transform: translate(-50%, -150%) scale(1);
+            }
+        }
+
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            z-index: 100;
+        }
+
+        .screen.active {
+            display: flex;
+        }
+
+        .menu-screen, .game-over-screen, .victory-screen, .phase-transition-screen {
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 30px;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 40px;
+            text-align: center;
+        }
+
+        .title {
+            font-size: 60px;
+            font-weight: bold;
+            background: linear-gradient(135deg, #00961C 0%, #00DB28 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 20px;
+        }
+
+        .subtitle {
+            font-size: 24px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00961C 0%, #00DB28 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(106, 234, 102, 0.4);
+        }
+
+        .btn-phase {
+            padding: 20px 25px;
+            font-size: 16px;
+            background: linear-gradient(135deg, #00961C 0%, #00DB28 100%);
+            color: white;
+            border-radius: 10px;
+            min-width: 200px;
+        }
+
+        .btn-phase:hover {
+            transform: translateY(-2px);
+        }
+
+        .instructions {
+            font-size: 16px;
+            color: #555;
+            max-width: 600px;
+            text-align: left;
+            line-height: 1.8;
+            margin: 20px 0;
+        }
+
+        .instructions h3 {
+            color: #333;
+            margin-top: 15px;
+            margin-bottom: 8px;
+        }
+
+        .flash-red {
+            animation: flashRed 0.3s ease;
+        }
+
+        @keyframes flashRed {
+            0%, 100% { background-color: #fff; }
+            50% { background-color: #ffcccc; }
+        }
+
+        .score-popup {
+            position: absolute;
+            font-weight: bold;
+            pointer-events: none;
+            animation: scoreFloat 0.8s ease-out;
+        }
+
+        @keyframes scoreFloat {
+            0% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            100% {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            max-width: 600px;
+            width: 90%;
+        }
+
+        .best-score {
+            font-size: 28px;
+            font-weight: bold;
+            color: #FFD700;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .title {
+                font-size: 40px;
+            }
+
+            .btn-phase {
+                min-width: 150px;
+                padding: 15px 20px;
+                font-size: 14px;
+            }
+
+            .instructions {
+                font-size: 14px;
+            }
+
+            .score-info {
+                font-size: 16px;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+
+        <div class="ui-overlay">
+            <div class="score-info">
+                <div>Pontos: <span id="scoreDisplay">0</span></div>
+                <div class="lives-display">
+                    Vidas: <span id="livesDisplay">3</span>❤️
+                </div>
+            </div>
+            <div class="phase-info" id="phaseDisplay">Menu</div>
+        </div>
+
+        <div class="controls-hint" id="controlsHint">
+            Setas ou A/D para mover | Clique/Toque para controles móveis
+        </div>
+
+        <!-- Menu Principal -->
+        <div class="screen menu-screen" id="menuScreen">
+            <div class="modal-content">
+                <div class="title">Mestre da Reciclagem</div>
+                <div class="subtitle">Aprenda a reciclar de forma divertida!</div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="game.showPhasesMenu()">Fases</button>
+                    <button class="btn-primary" onclick="game.startPhase(6)">Modo Sobrevivência</button>
+                </div>
+
+                <div class="instructions">
+                    <h3>Como Jogar:</h3>
+                    <p>✓ Mova a lixeira para coletar o lixo correto</p>
+                    <p>✓ Lixos errados diminuem suas vidas</p>
+                    <p>✓ Coletar itens em sequência aumenta seu combo!</p>
+                    <p>✓ Fases 1-5: Atinja 100 pontos para passar de fase</p>
+                    <p>✓ Modo Sobrevivência: Jogue infinitamente até morrer!</p>
+                    <h3>Controles:</h3>
+                    <p>Setinhas ou A/D: Mover</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Menu de Fases -->
+        <div class="screen menu-screen" id="phasesMenuScreen">
+            <div class="modal-content">
+                <div class="title">Selecione uma Fase</div>
+
+                <div class="button-group">
+                    <button class="btn-primary" onclick="game.startPhase(1)">Fase 1: Papel 🔵</button>
+                    <button class="btn-primary" onclick="game.startPhase(2)">Fase 2: Plástico 🔴</button>
+                    <button class="btn-primary" onclick="game.startPhase(3)">Fase 3: Vidro 🟢</button>
+                    <button class="btn-primary" onclick="game.startPhase(4)">Fase 4: Metal 🟡</button>
+                    <button class="btn-primary" onclick="game.startPhase(5)">Fase 5: Orgânico 🟤</button>
+                </div>
+
+                <button class="btn-primary" onclick="game.showMenu()" style="margin-top: 20px;">Voltar</button>
+            </div>
+        </div>
+
+        <!-- Transição de Fase -->
+        <div class="screen phase-transition-screen" id="phaseTransitionScreen">
+            <div class="modal-content">
+                <div class="title" id="transitionTitle">Fase 2 - Papel!</div>
+                <div class="subtitle" id="transitionDesc">Colete 100 pontos em Papel!</div>
+                <button class="btn-primary" onclick="game.continuePhase()">Começar</button>
+            </div>
+        </div>
+
+        <!-- Game Over -->
+        <div class="screen game-over-screen" id="gameOverScreen">
+            <div class="modal-content">
+                <div class="title" style="font-size: 50px; color: #e74c3c;">Game Over!</div>
+                <div class="subtitle" id="gameOverMessage">Você perdeu todas as vidas</div>
+                <div style="font-size: 32px; font-weight: bold; color: #49f58b; margin: 20px 0;">
+                    Pontos Finais: <span id="finalScore">0</span>
+                </div>
+                <div class="best-score" id="bestScoreDisplay" style="display: none;">
+                    🏆 Melhor Pontuação: <span id="bestScoreValue">0</span>
+                </div>
+                <div class="button-group" style="margin-top: 30px;">
+                    <button class="btn-primary" onclick="game.showMenu()">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Vitória -->
+        <div class="screen victory-screen" id="victoryScreen">
+            <div class="modal-content">
+                <div class="title" style="font-size: 50px; color: #27ae60;">✅ Fase Vencida!</div>
+                <div class="subtitle" id="victoryMessage">Você completou a Fase 1!</div>
+                <div class="button-group" style="margin-top: 30px;">
+                    <button class="btn-primary" id="nextPhaseBtn" onclick="game.nextPhase()">Próxima Fase</button>
+                    <button class="btn-primary" onclick="game.showMenu()">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="image-config.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
